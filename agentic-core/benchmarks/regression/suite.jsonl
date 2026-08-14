@@ -1,0 +1,20 @@
+{"id": "arith_mul", "prompt": "Compute 17 * 23. Reply with only the integer.", "expected": "391", "checker": "exact"}
+{"id": "arith_add", "prompt": "What is 128 + 256? Reply with only the integer.", "expected": "384", "checker": "exact"}
+{"id": "arith_sub", "prompt": "Compute 1000 - 37. Reply with only the integer.", "expected": "963", "checker": "exact"}
+{"id": "arith_div", "prompt": "What is 144 divided by 12? Reply with only the integer.", "expected": "12", "checker": "exact"}
+{"id": "arith_pow", "prompt": "What is 2 to the power 10? Reply with only the integer.", "expected": "1024", "checker": "exact"}
+{"id": "str_reverse", "prompt": "Reverse the string 'hello'. Reply with only the reversed string.", "expected": "olleh", "checker": "exact"}
+{"id": "str_upper", "prompt": "Convert 'agent' to uppercase. Reply with only the result.", "expected": "AGENT", "checker": "exact"}
+{"id": "str_len", "prompt": "How many letters are in the word 'banana'? Reply with only the integer.", "expected": "6", "checker": "exact"}
+{"id": "date_year", "prompt": "Extract the 4-digit year from '2026-08-10'. Reply with only the year.", "expected": "2026", "checker": "exact"}
+{"id": "geo_capital", "prompt": "What is the capital of France? Reply with one word.", "expected": "Paris", "checker": "exact"}
+{"id": "prime_yes", "prompt": "Is 17 a prime number? Reply with only 'yes' or 'no'.", "expected": "^yes$", "checker": "regex"}
+{"id": "div_no", "prompt": "Is 100 divisible by 7? Reply with only 'yes' or 'no'.", "expected": "^no$", "checker": "regex"}
+{"id": "frac_larger", "prompt": "Which is larger, 3/8 or 2/5? Reply with only the fraction.", "expected": "2/5", "checker": "exact"}
+{"id": "json_value", "prompt": "Given {\"a\":1,\"b\":2}, what is the value of key b? Reply with only the integer.", "expected": "2", "checker": "exact"}
+{"id": "hex_red", "prompt": "Reply with the hex color for pure red in #RRGGBB form, uppercase, and nothing else.", "expected": "^#FF0000$", "checker": "regex"}
+{"id": "sort_nums", "prompt": "Sort these numbers ascending, comma-separated with no spaces: 3,1,2", "expected": "1,2,3", "checker": "exact"}
+{"id": "palindrome", "prompt": "Is 'level' a palindrome? Reply with only 'yes' or 'no'.", "expected": "^yes$", "checker": "regex"}
+{"id": "roman_9", "prompt": "What is the Roman numeral for 9? Reply with only the numeral.", "expected": "IX", "checker": "exact"}
+{"id": "acronym_cpu", "prompt": "What does 'CPU' stand for? Reply with only the three words.", "expected": "^Central Processing Unit$", "checker": "regex"}
+{"id": "leap_feb", "prompt": "How many days are in February during a leap year? Reply with only the integer.", "expected": "29", "checker": "exact"}
