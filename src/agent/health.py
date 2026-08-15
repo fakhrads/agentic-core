@@ -80,6 +80,15 @@ async def _check_ollama(s: Settings) -> str:
         return f"HTTP {resp.status_code}"
 
 
+async def _check_whatsapp(s: Settings) -> str:
+    secret = s.whatsapp_bridge_secret.get_secret_value()
+    if not secret:
+        return "not configured"
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        resp = await client.get(f"{s.whatsapp_bridge_url.rstrip('/')}/health")
+        return f"HTTP {resp.status_code}"
+
+
 async def _check_tools(s: Settings) -> str:
     headers = {
         "Authorization": f"Bearer {s.tools_service_token.get_secret_value()}",
@@ -98,6 +107,7 @@ async def run_health_checks(settings: Settings | None = None) -> list[CheckResul
         _timed("deepseek", _check_deepseek(s)),
         _timed("ollama", _check_ollama(s)),
         _timed("tools_backend", _check_tools(s)),
+        _timed("whatsapp", _check_whatsapp(s)),
     )
     return list(results)
 

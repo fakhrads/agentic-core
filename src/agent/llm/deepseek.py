@@ -60,8 +60,10 @@ class DeepSeekProvider:
         api_key: str,
         model: str,
         timeout_s: float,
+        provider_name: str = "deepseek",
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
+        self.name = provider_name
         self.model = model
         self._client = httpx.AsyncClient(
             base_url=base_url.rstrip("/"),

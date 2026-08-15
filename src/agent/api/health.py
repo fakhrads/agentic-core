@@ -7,6 +7,8 @@ components (loop, curator) register their own gauges/counters against it.
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import FastAPI, Response
 from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, Gauge, generate_latest
 
@@ -46,9 +48,24 @@ async def _refresh_regression_gauges() -> None:
         return
 
 
-def create_app() -> FastAPI:
+def create_app(daemon: Any | None = None) -> FastAPI:
+    """Build the daemon's HTTP surface.
+
+    `daemon` is the live `Daemon` instance when served from `agent up` (needed
+    by webhook routes that must call `daemon.ingest()`); it's None for
+    ad-hoc/test app construction, in which case webhook POSTs 503.
+    """
     app = FastAPI(title="agent-core", version="0.1.0")
+    app.state.daemon = daemon
     UP.set(1)
+
+    from agent.config import get_settings
+
+    s = get_settings()
+    if s.whatsapp_bridge_secret.get_secret_value():
+        from agent.api.whatsapp_webhook import router as whatsapp_router
+
+        app.include_router(whatsapp_router)
 
     @app.get("/health")
     async def health() -> Response:
@@ -72,6 +89,40 @@ def create_app() -> FastAPI:
     async def metrics() -> Response:
         await _refresh_regression_gauges()
         return Response(content=generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)
+
+    @app.get("/api/status")
+    async def api_status() -> Response:
+        """Same data `agent watch` renders, as JSON — foundation for a future
+        desktop/web client that polls instead of touching Redis/Postgres
+        directly. No auth: matches /health and /metrics, localhost-only by
+        default (AGENT_HTTP_HOST)."""
+        import json
+        from dataclasses import asdict
+
+        import redis.asyncio as redis_asyncio
+
+        from agent.autonomy.budget import BudgetManager
+        from agent.bus.streams import EventBus
+        from agent.dashboard import gather_snapshot
+
+        settings = get_settings()
+        redis = redis_asyncio.from_url(settings.redis_url, decode_responses=True)
+        try:
+            bus = EventBus(redis)
+            budget = BudgetManager(
+                redis,
+                default_tokens=settings.budget_tokens,
+                default_cost_usd=settings.budget_cost_usd,
+                default_actions=settings.budget_actions,
+            )
+            snap = await gather_snapshot(settings.postgres_dsn, redis, bus, budget)
+        finally:
+            await redis.aclose()  # type: ignore[attr-defined]
+
+        return Response(
+            content=json.dumps(asdict(snap), default=str),
+            media_type="application/json",
+        )
 
     return app
 

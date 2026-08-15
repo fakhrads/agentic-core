@@ -1,4 +1,5 @@
-from agent.health import CheckResult, _timed, all_ok
+from agent.config import Settings
+from agent.health import CheckResult, _check_whatsapp, _timed, all_ok
 
 
 async def test_timed_reports_ok_on_success() -> None:
@@ -25,3 +26,8 @@ def test_all_ok() -> None:
     mixed = [CheckResult("a", True, "", 1.0), CheckResult("b", False, "x", 1.0)]
     assert all_ok(ok) is True
     assert all_ok(mixed) is False
+
+
+async def test_check_whatsapp_reports_not_configured_when_unset() -> None:
+    detail = await _check_whatsapp(Settings())
+    assert detail == "not configured"

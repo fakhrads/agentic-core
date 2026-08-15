@@ -19,9 +19,10 @@ from agent.autonomy.approvals import list_pending
 from agent.autonomy.budget import BudgetManager
 from agent.bus.events import STREAM_INBOUND, Event
 from agent.bus.streams import GROUP_LOOP, ConsumerRunner, EventBus
-from agent.channels.base import ChannelRegistry, InboundMessage
+from agent.channels.base import Channel, ChannelRegistry, InboundMessage
 from agent.channels.dev import DevChannel
 from agent.channels.telegram import TelegramChannel
+from agent.channels.whatsapp import WhatsAppChannel
 from agent.config import Settings, get_settings
 from agent.db.base import dispose_engines, session_scope
 from agent.db.models import SKILL_PROBATION, Skill
@@ -61,7 +62,7 @@ _BUSY_MESSAGE = "Sistem sedang sibuk, coba lagi sebentar."
 
 
 class Daemon:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, extra_channels: list[Channel] | None = None) -> None:
         self.settings = settings
         self.redis = redis_asyncio.from_url(settings.redis_url, decode_responses=True)
         self.bus = EventBus(self.redis)
@@ -76,6 +77,7 @@ class Daemon:
             api_key=settings.deepseek_api_key.get_secret_value(),
             model=settings.deepseek_model,
             timeout_s=settings.deepseek_timeout_s,
+            provider_name=settings.llm_provider,
         )
         self.recorder = DBCostRecorder(settings.postgres_dsn)
         self.llm = BudgetedLLM(self.deepseek, self.budget, self.recorder)
@@ -115,6 +117,19 @@ class Daemon:
                 token=token, allowed_chat_ids=settings.allowed_chat_ids()
             )
             self.channels.register(self.telegram)
+
+        self.whatsapp: WhatsAppChannel | None = None
+        wa_secret = settings.whatsapp_bridge_secret.get_secret_value()
+        if wa_secret:
+            self.whatsapp = WhatsAppChannel(
+                bridge_url=settings.whatsapp_bridge_url,
+                bridge_secret=wa_secret,
+                allowed_numbers=settings.allowed_whatsapp_numbers(),
+            )
+            self.channels.register(self.whatsapp)
+
+        for channel in extra_channels or []:
+            self.channels.register(channel)
 
         ctx = LoopContext(
             dsn=settings.postgres_dsn,
@@ -273,8 +288,10 @@ class Daemon:
         await beat(self.redis)
         log.info("daemon_starting", telegram=bool(self.telegram))
 
+        from agent.api.health import create_app
+
         config = uvicorn.Config(
-            "agent.api.health:app",
+            create_app(daemon=self),
             host=self.settings.http_host,
             port=self.settings.http_port,
             log_level=self.settings.log_level.lower(),
@@ -335,6 +352,8 @@ class Daemon:
         await self.tools_client.aclose()
         if self.telegram is not None:
             await self.telegram.aclose()
+        if self.whatsapp is not None:
+            await self.whatsapp.aclose()
         await self.bus.aclose()
         await dispose_engines()
 

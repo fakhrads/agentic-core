@@ -98,6 +98,13 @@ class CostRecorder(Protocol):
 PRICING: dict[tuple[str, str], tuple[float, float]] = {
     ("deepseek", "deepseek-chat"): (0.27, 1.10),
     ("deepseek", "deepseek-reasoner"): (0.55, 2.19),
+    ("openai", "gpt-4o"): (2.50, 10.00),
+    ("openai", "gpt-4o-mini"): (0.15, 0.60),
+    ("openai", "gpt-4.1"): (2.00, 8.00),
+    ("openai", "gpt-4.1-mini"): (0.40, 1.60),
+    ("openrouter", "openai/gpt-4o-mini"): (0.15, 0.60),
+    ("openrouter", "anthropic/claude-sonnet-4"): (3.00, 15.00),
+    ("openrouter", "meta-llama/llama-3.3-70b-instruct"): (0.12, 0.30),
 }
 
 

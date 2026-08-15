@@ -34,7 +34,12 @@ class Settings(BaseSettings):
     # Postgres + pgvector.
     postgres_dsn: str = "postgresql+asyncpg://agent:agent@localhost:5432/agent"
 
-    # DeepSeek — planning / big model.
+    # Primary chat provider — DeepSeekProvider is OpenAI-wire-compatible, so
+    # these fields double as the generic "primary LLM" slot for any
+    # OpenAI-compatible endpoint (OpenAI, OpenRouter, custom). `llm_provider`
+    # is a cosmetic label used for cost-table lookup and display only; switch
+    # it (and the fields below) via `agent model set`.
+    llm_provider: str = "deepseek"
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_api_key: SecretStr = SecretStr("")
     deepseek_model: str = "deepseek-chat"
@@ -64,6 +69,13 @@ class Settings(BaseSettings):
     telegram_bot_token: SecretStr = SecretStr("")
     telegram_allowed_chat_ids: str = ""
 
+    # WhatsApp — unofficial, via a local Baileys (Node.js) bridge sidecar
+    # (whatsapp-bridge/). No Meta Business account/API needed: the bridge logs
+    # in by QR-code scan and talks to this process over localhost HTTP.
+    whatsapp_bridge_url: str = "http://127.0.0.1:8098"
+    whatsapp_bridge_secret: SecretStr = SecretStr("")
+    whatsapp_allowed_numbers: str = ""
+
     # Daily autonomy budget.
     budget_tokens: int = 500_000
     budget_cost_usd: float = 2.00
@@ -87,6 +99,12 @@ class Settings(BaseSettings):
 
     def research_source_list(self) -> list[str]:
         return [u.strip() for u in self.research_sources.split(",") if u.strip()]
+
+    def allowed_whatsapp_numbers(self) -> set[str]:
+        raw = self.whatsapp_allowed_numbers.strip()
+        if not raw:
+            return set()
+        return {x.strip() for x in raw.split(",") if x.strip()}
 
     def redacted(self) -> dict[str, object]:
         """Dict view with secrets masked — safe for `agent config show`."""

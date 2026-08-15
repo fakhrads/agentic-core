@@ -78,6 +78,24 @@ async def test_retries_on_503_then_succeeds() -> None:
     await provider.aclose()
 
 
+async def test_provider_name_overrides_cost_label() -> None:
+    def handler(_req: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_ok_body())
+
+    provider = DeepSeekProvider(
+        base_url="https://api.openai.com/v1",
+        api_key="test",
+        model="gpt-4o-mini",
+        timeout_s=5,
+        provider_name="openai",
+        transport=httpx.MockTransport(handler),  # type: ignore[arg-type]
+    )
+    assert provider.name == "openai"
+    result = await provider.complete([ChatMessage("user", "hi")], max_tokens=16)
+    assert result.provider == "openai"
+    await provider.aclose()
+
+
 async def test_does_not_retry_on_400() -> None:
     calls = {"n": 0}
 
