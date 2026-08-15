@@ -2,7 +2,7 @@ import fakeredis.aioredis
 import pytest
 
 from agent.bus.events import STREAM_AUDIT, STREAM_DLQ, Event, EventType
-from agent.bus.streams import EventBus
+from agent.bus.streams import ConsumerRunner, EventBus
 
 
 @pytest.fixture
@@ -71,3 +71,21 @@ async def test_unparseable_event_goes_to_dlq(bus: EventBus) -> None:
     stats = await bus.process_batch(STREAM_AUDIT, "g3", "c1", handler, block_ms=10)
     assert stats.parse_errors == 1
     assert await bus.xlen(STREAM_DLQ) == 1
+
+
+async def test_consumer_runner_defaults_to_a_short_poll(bus: EventBus) -> None:
+    # Regression: block_ms used to default to process_batch's 5s ceiling, so
+    # stop() could sit unnoticed for up to 5s per poll — noticeable enough to
+    # tempt a second, forced Ctrl-C on `agent up`. ConsumerRunner now pins its
+    # own short default instead of inheriting process_batch's.
+    #
+    # Not exercised end-to-end here: fakeredis's async XREADGROUP doesn't
+    # honor `block` (returns immediately), so a real run()/stop() loop against
+    # it spins hot instead of blocking — this only checks the wiring.
+    async def handler(ev: Event) -> None:  # pragma: no cover - not invoked
+        pass
+
+    runner = ConsumerRunner(
+        bus=bus, stream=STREAM_AUDIT, group="g4", consumer="c1", handler=handler
+    )
+    assert runner.block_ms == 1000

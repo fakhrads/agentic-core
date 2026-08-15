@@ -21,6 +21,14 @@ ops_app = typer.Typer(help="Operate the daemon: up, down, health, config.")
 _PIDFILE = Path(os.environ.get("AGENT_PIDFILE", "./.agent.pid"))
 
 
+#: Exceptions that surface from a forced/second Ctrl-C cancelling an in-flight
+#: redis call mid-shutdown (e.g. redis-py wrapping the resulting CancelledError
+#: as its own TimeoutError/ConnectionError) — a normal side effect of stopping
+#: this way, not a problem the user needs to act on. `agent health` is the
+#: right tool if a real outage is suspected, not this exit path.
+_SHUTDOWN_NOISE = (TimeoutError, ConnectionError, OSError)
+
+
 def _serve() -> None:
     """Run the full daemon (health server + loop consumer + channels).
 
@@ -33,7 +41,7 @@ def _serve() -> None:
 
     try:
         asyncio.run(run_daemon())
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, *_SHUTDOWN_NOISE):
         err_console.print("\n[dim]agent stopped[/]")
     except Exception as exc:  # noqa: BLE001
         err_console.print(f"[red]agent stopped with an error:[/] {type(exc).__name__}: {exc}")

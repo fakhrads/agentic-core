@@ -240,6 +240,10 @@ class ConsumerRunner:
     handler: Handler
     max_deliveries: int = 5
     min_idle_ms: int = 30_000
+    # Short poll ceiling, not process_batch's 5s default — stop() must be
+    # noticed quickly so `agent up` exits promptly on a single Ctrl-C instead
+    # of tempting a second, forced one mid-shutdown.
+    block_ms: int = 1000
     _stop: bool = field(default=False, init=False)
 
     def stop(self) -> None:
@@ -256,5 +260,6 @@ class ConsumerRunner:
                 self.handler,
                 max_deliveries=self.max_deliveries,
                 min_idle_ms=self.min_idle_ms,
+                block_ms=self.block_ms,
             )
         log.info("consumer_stopped", stream=self.stream, group=self.group)
