@@ -52,14 +52,41 @@ def _serve() -> None:
         raise typer.Exit(code=1) from None
 
 
+def preflight() -> None:
+    """Refuse to start when Redis can't do what the event loop needs.
+
+    Starting anyway is worse than not starting: the daemon looks healthy,
+    logs a warning every second, and silently processes nothing. Fail here
+    with the command that fixes it instead.
+    """
+    from agent.cli.doctor import redis_usable_sync
+
+    ok, detail = redis_usable_sync(get_settings().redis_url)
+    if ok:
+        return
+    err_console.print(f"[red]Redis is not usable:[/] {detail}")
+    err_console.print(
+        "[dim]The event loop needs blocking stream reads, which this endpoint "
+        "isn't serving. Run [cyan]agent doctor --fix[/] to repair the config "
+        "(often a native Redis squatting on the default port).[/]"
+    )
+    raise typer.Exit(code=1)
+
+
 @ops_app.command("up")
 def up(
     detach: bool = typer.Option(False, "--detach", help="Run in the background."),
+    skip_preflight: bool = typer.Option(
+        False, "--skip-preflight", help="Start even if the Redis check fails."
+    ),
 ) -> None:
     """Start the daemon (health server + loop consumer + channels)."""
     if _PIDFILE.exists():
         err_console.print(f"[yellow]Already running? pidfile exists at {_PIDFILE}[/]")
         raise typer.Exit(code=1)
+
+    if not skip_preflight:
+        preflight()
 
     s = get_settings()
     if detach:

@@ -16,6 +16,7 @@ import typer
 
 from agent.cli._output import console, err_console
 from agent.cli.db import run_migrations
+from agent.cli.doctor import repair_config
 
 
 def _find_repo_root() -> Path | None:
@@ -57,6 +58,13 @@ def update() -> None:
         console.print("[dim]Database schema up to date.[/]")
     else:
         console.print("[yellow]Migrations not applied[/] — run [cyan]agent db upgrade[/] later.")
+
+    # An update can change what the defaults point at (e.g. moving Redis off a
+    # port a native install squats on). Repairing an existing .env here is the
+    # difference between "it just works after updating" and a silent daemon
+    # that consumes nothing until the user hand-edits config.
+    console.print("[dim]Checking configuration…[/]")
+    repair_config()
 
     console.print("[green]Updated.[/] Restart `agent` / `agent up` for changes to take effect.")
 

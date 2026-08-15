@@ -138,22 +138,20 @@ protokol yang sama dipakai WhatsApp Web) — jadi nggak perlu daftar Meta Busine
 cukup scan QR code kayak buka WhatsApp Web biasa. Ada 2 proses yang jalan bareng: `agent up`
 (si agent) dan si "bridge" (Node.js kecil yang jadi jembatan ke WhatsApp).
 
-1. Jalankan `agent setup`, pilih "Enable WhatsApp? y". Wizard-nya bakal bikinin **secret**
-   otomatis (semacam password rahasia antara agent & bridge) — biarin aja pakai yang digenerate,
-   nanti dicatat.
+1. Jalankan `agent setup`, pilih "Enable WhatsApp? y". Wizard-nya bikin **secret** otomatis
+   (password rahasia antara agent & bridge). Nggak perlu dicatat — bridge-nya baca sendiri
+   dari `.env` utama.
 2. Masuk folder bridge, install dependency-nya (sekali aja, butuh [Node.js](https://nodejs.org) 18+):
    ```bash
    cd whatsapp-bridge
    npm install
-   cp .env.example .env
+   npm start
    ```
-3. Buka `whatsapp-bridge/.env`, isi `BRIDGE_SECRET` dengan secret yang sama persis kayak yang
-   ditulis `agent setup` tadi (ada di `.env` utama, key `AGENT_WHATSAPP_BRIDGE_SECRET`).
-4. Jalankan bridge-nya: `npm start`. Bakal muncul QR code di terminal — scan pakai HP:
+3. Bakal muncul QR code di terminal — scan pakai HP:
    **WhatsApp → Setelan → Perangkat tertaut → Tautkan perangkat**.
-5. Kalau di terminal muncul `Connected to WhatsApp.`, berarti udah nyambung. Sesi login-nya
+4. Kalau di terminal muncul `Connected to WhatsApp.`, berarti udah nyambung. Sesi login-nya
    disimpan di `whatsapp-bridge/auth/` supaya nggak perlu scan ulang tiap kali dijalankan.
-6. Jalankan agent-nya (`agent up`, bukan `agent chat`) di terminal lain — biarin bridge & agent
+5. Jalankan agent-nya (`agent up`, bukan `agent chat`) di terminal lain — biarin bridge & agent
    jalan bersamaan, keduanya harus tetap nyala biar WhatsApp-nya standby.
 
 Setelah nyambung, pesan WhatsApp yang masuk otomatis diteruskan bridge → agent, diproses, dan
@@ -192,12 +190,21 @@ Setelah update, restart proses yang lagi jalan (`agent` / `agent up`) biar perub
 ### 10. Kalau ada masalah
 
 ```bash
+agent doctor --fix
+```
+
+**Coba ini duluan.** Dia ngecek config yang bikin agent diem-diem nggak jalan, terus
+**benerin sendiri**: Redis yang nggak bisa dipakai (bakal otomatis `docker compose up -d`
+dan update `.env` kamu), secret WhatsApp yang beda, dst. Tanpa `--fix` dia cuma ngasih tau
+tanpa ngubah apa-apa.
+
+```bash
 agent health
 ```
 
 Ini ngecek semua koneksi yang dibutuhkan (Redis, Postgres, provider LLM, Ollama, WhatsApp, dst)
-dan bilang mana yang bermasalah beserta detail errornya. Ini langkah pertama yang paling
-berguna kalau agent-nya nggak mau jalan atau nggak balas.
+dan bilang mana yang bermasalah beserta detail errornya. Bedanya sama `agent doctor`: `health`
+cuma ngasih laporan kondisi sekarang, `doctor` yang benerin config-nya.
 
 ```bash
 agent config show            # lihat konfigurasi aktif (secret disamarkan)
@@ -207,17 +214,15 @@ agent config show --secrets  # sama, tapi secret ditampilkan (hati-hati siapa ya
 Masalah umum:
 
 - **"connection refused" ke Redis/Postgres** → Docker belum nyala, jalankan `docker compose up -d`.
-- **`Timeout reading from localhost:6379`, atau agent mati sendiri setelah beberapa detik** →
-  ada Redis lain (biasanya bawaan Homebrew) yang udah nempatin port 6379 duluan, jadi agent
-  nyambung ke situ, bukan ke Redis Docker-nya. Beberapa build Redis native nge-hang pas dipakai
-  baca stream, dan itu bikin agent-nya berhenti. Karena itu Docker di repo ini pakai port
-  **6380** (dan Postgres **5433**). Pastikan `.env` kamu ikut:
-  ```
-  AGENT_REDIS_URL=redis://localhost:6380/0
-  AGENT_POSTGRES_DSN=postgresql+asyncpg://agent:agent@localhost:5433/agent
-  ```
-  Cek siapa yang pakai port-nya: `lsof -nP -iTCP:6379 -sTCP:LISTEN`. Kalau mau, Redis native-nya
-  boleh dimatiin (`brew services stop redis`), tapi nggak wajib kalau port-nya udah dipisah.
+- **`Timeout reading from localhost:6379`, atau `agent up` nolak jalan** → ada Redis lain
+  (biasanya bawaan Homebrew) yang nempatin port 6379 duluan, jadi agent nyambung ke situ,
+  bukan ke Redis Docker-nya — dan beberapa build Redis native nge-hang pas dipakai baca stream.
+  **Jalanin `agent doctor --fix`**, dia beresin sendiri (Docker di repo ini pakai port **6380**,
+  Postgres **5433**). Mau cek manual siapa yang pakai port-nya: `lsof -nP -iTCP:6379 -sTCP:LISTEN`.
+- **WhatsApp `403 Forbidden` di log** → secret bridge-nya beda. Normalnya nggak akan kejadian
+  (bridge otomatis baca `AGENT_WHATSAPP_BRIDGE_SECRET` dari `.env` utama). Kalau kamu terlanjur
+  bikin `whatsapp-bridge/.env` dengan `BRIDGE_SECRET` sendiri, hapus aja baris itu — atau
+  jalanin `agent doctor` buat ngecek.
 - **Provider LLM error 401** → API key salah/kosong, jalankan `agent model set` buat perbaiki.
 - **Ollama error** → `ollama serve` belum jalan di komputer kamu, atau modelnya belum di-pull
   (`ollama pull nomic-embed-text` dan `ollama pull qwen2.5:3b`).

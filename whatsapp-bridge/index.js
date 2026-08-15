@@ -13,20 +13,45 @@
 //   AGENT_WEBHOOK_URL   the agent's inbound webhook            (default http://127.0.0.1:8099/webhooks/whatsapp)
 
 import 'dotenv/config';
+import { readFileSync } from 'node:fs';
 import express from 'express';
 import pino from 'pino';
 import qrcode from 'qrcode-terminal';
 import makeWASocket, { DisconnectReason, useMultiFileAuthState } from '@whiskeysockets/baileys';
 
+// The agent's .env is the single source of truth for the shared secret, so
+// there's nothing to copy between two files (a mismatch silently becomes a
+// 403 on every inbound message). A local BRIDGE_SECRET still wins if set.
+function secretFromAgentEnv() {
+  try {
+    const text = readFileSync(new URL('../.env', import.meta.url), 'utf8');
+    for (const line of text.split('\n')) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('#') || !trimmed.includes('=')) continue;
+      const [key, ...rest] = trimmed.split('=');
+      if (key.trim() === 'AGENT_WHATSAPP_BRIDGE_SECRET') {
+        // Strip an inline comment the same way the agent's own parser does.
+        const raw = rest.join('=').trim();
+        const [value] = raw.startsWith('"') || raw.startsWith("'") ? [raw] : raw.split(' #');
+        return value.trim();
+      }
+    }
+  } catch {
+    // No agent .env next door (bridge run standalone) — fall through.
+  }
+  return '';
+}
+
 const PORT = Number(process.env.BRIDGE_PORT || 8098);
-const SECRET = process.env.BRIDGE_SECRET || '';
+const SECRET = process.env.BRIDGE_SECRET || secretFromAgentEnv();
 const AUTH_DIR = process.env.BRIDGE_AUTH_DIR || './auth';
 const AGENT_WEBHOOK_URL = process.env.AGENT_WEBHOOK_URL || 'http://127.0.0.1:8099/webhooks/whatsapp';
 
 if (!SECRET) {
   console.warn(
-    '[bridge] BRIDGE_SECRET is empty — anyone who can reach this port can send/receive ' +
-      'through your WhatsApp. Fine for local dev, set it for anything else.'
+    '[bridge] No shared secret found (AGENT_WHATSAPP_BRIDGE_SECRET in the agent .env, ' +
+      'or BRIDGE_SECRET here). Anyone who can reach this port can send/receive through ' +
+      'your WhatsApp — fine for local dev, set it for anything else.'
   );
 }
 

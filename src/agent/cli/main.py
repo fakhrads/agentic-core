@@ -16,6 +16,7 @@ from agent.cli.chat import chat
 from agent.cli.control import budget_app
 from agent.cli.db import db_app
 from agent.cli.dev import dev_app
+from agent.cli.doctor import doctor_app
 from agent.cli.drift import drift_app
 from agent.cli.evolution import regression_app
 from agent.cli.goals import goals_app
@@ -56,6 +57,7 @@ app.command("chat")(chat)
 app.command("update")(update)
 app.add_typer(model_app, name="model")
 app.add_typer(db_app, name="db")
+app.add_typer(doctor_app, name="doctor")
 
 # --- Real M1 commands ---
 app.command("up")(up)
