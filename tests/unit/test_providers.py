@@ -41,3 +41,15 @@ def test_blank_key_keeps_existing(monkeypatch: pytest.MonkeyPatch) -> None:
     _queue_answers(monkeypatch, ["deepseek", "deepseek-chat", ""])
     updates = prompt_llm_provider({"AGENT_DEEPSEEK_API_KEY": "existing-key"})
     assert updates["AGENT_DEEPSEEK_API_KEY"] == "existing-key"
+
+
+def test_malformed_current_provider_falls_back_instead_of_crashing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Regression: a garbled AGENT_LLM_PROVIDER value (e.g. from a parser that
+    # didn't strip an inline comment) must not KeyError the PRESETS lookup.
+    _queue_answers(monkeypatch, ["deepseek", "deepseek-chat", ""])
+    updates = prompt_llm_provider(
+        {"AGENT_LLM_PROVIDER": "deepseek                          # some stale comment"}
+    )
+    assert updates["AGENT_LLM_PROVIDER"] == "deepseek"

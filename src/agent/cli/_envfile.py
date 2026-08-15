@@ -10,6 +10,14 @@ from __future__ import annotations
 from pathlib import Path
 
 
+def _strip_inline_comment(value: str) -> str:
+    """Mirrors python-dotenv: an unquoted value ends at whitespace-then-`#`."""
+    if value.startswith(('"', "'")):
+        return value
+    head, sep, _ = value.partition(" #")
+    return head.rstrip() if sep else value
+
+
 def read_env(path: Path) -> dict[str, str]:
     if not path.exists():
         return {}
@@ -19,7 +27,7 @@ def read_env(path: Path) -> dict[str, str]:
         if not stripped or stripped.startswith("#") or "=" not in stripped:
             continue
         key, _, value = stripped.partition("=")
-        out[key.strip()] = value.strip()
+        out[key.strip()] = _strip_inline_comment(value.strip())
     return out
 
 

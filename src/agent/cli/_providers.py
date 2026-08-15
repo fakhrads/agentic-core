@@ -36,11 +36,12 @@ PRESETS: dict[str, ProviderPreset] = {
 def prompt_llm_provider(current: dict[str, str]) -> dict[str, str]:
     """Interactively pick a provider/model/key; returns AGENT_* env updates."""
     console.print("\n[bold]LLM provider[/] — the primary chat model the agent thinks with.")
-    choice = Prompt.ask(
-        "Provider",
-        choices=list(PRESETS),
-        default=current.get("AGENT_LLM_PROVIDER", "deepseek"),
-    )
+    # `Prompt.ask`'s `default` isn't validated against `choices` — a stale/malformed
+    # value in .env would otherwise sail through unprompted and crash the PRESETS
+    # lookup below, so fall back to "deepseek" if it's not a known preset.
+    current_provider = current.get("AGENT_LLM_PROVIDER", "deepseek")
+    default_provider = current_provider if current_provider in PRESETS else "deepseek"
+    choice = Prompt.ask("Provider", choices=list(PRESETS), default=default_provider)
     preset = PRESETS[choice]
 
     base_url = preset.base_url
