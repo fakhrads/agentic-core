@@ -5,7 +5,10 @@ services:
     image: redis:7-alpine
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "6379:6379"
+      # Host port 6380, not 6379 — avoids colliding with a native/Homebrew
+      # Redis already running on the default port (common on dev machines,
+      # and some builds hang on blocking XREADGROUP, wedging the event loop).
+      - "6380:6379"
     volumes:
       - redis-data:/data
     healthcheck:

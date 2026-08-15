@@ -207,6 +207,17 @@ agent config show --secrets  # sama, tapi secret ditampilkan (hati-hati siapa ya
 Masalah umum:
 
 - **"connection refused" ke Redis/Postgres** → Docker belum nyala, jalankan `docker compose up -d`.
+- **`Timeout reading from localhost:6379`, atau agent mati sendiri setelah beberapa detik** →
+  ada Redis lain (biasanya bawaan Homebrew) yang udah nempatin port 6379 duluan, jadi agent
+  nyambung ke situ, bukan ke Redis Docker-nya. Beberapa build Redis native nge-hang pas dipakai
+  baca stream, dan itu bikin agent-nya berhenti. Karena itu Docker di repo ini pakai port
+  **6380** (dan Postgres **5433**). Pastikan `.env` kamu ikut:
+  ```
+  AGENT_REDIS_URL=redis://localhost:6380/0
+  AGENT_POSTGRES_DSN=postgresql+asyncpg://agent:agent@localhost:5433/agent
+  ```
+  Cek siapa yang pakai port-nya: `lsof -nP -iTCP:6379 -sTCP:LISTEN`. Kalau mau, Redis native-nya
+  boleh dimatiin (`brew services stop redis`), tapi nggak wajib kalau port-nya udah dipisah.
 - **Provider LLM error 401** → API key salah/kosong, jalankan `agent model set` buat perbaiki.
 - **Ollama error** → `ollama serve` belum jalan di komputer kamu, atau modelnya belum di-pull
   (`ollama pull nomic-embed-text` dan `ollama pull qwen2.5:3b`).

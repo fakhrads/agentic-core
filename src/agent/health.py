@@ -39,13 +39,32 @@ async def _timed(name: str, coro: Awaitable[str]) -> CheckResult:
     return CheckResult(name=name, ok=ok, detail=detail, latency_ms=round(latency, 1))
 
 
+_HEALTH_STREAM = "events:healthcheck"
+_HEALTH_GROUP = "healthcheck"
+
+
 async def _check_redis(s: Settings) -> str:
+    """PING plus a short blocking XREADGROUP.
+
+    PING alone is not enough: the daemon's event loop lives on blocking
+    XREADGROUP, and a server can answer PING fine while never returning from a
+    blocking stream read (observed with some non-Docker Redis builds squatting
+    on the default port). That combination made `agent health` report "ok"
+    while the agent silently consumed nothing.
+    """
     import redis.asyncio as aioredis
 
-    client = aioredis.from_url(s.redis_url, socket_connect_timeout=3)
+    client = aioredis.from_url(s.redis_url, socket_connect_timeout=3, socket_timeout=5)
     try:
         await client.ping()
-        return "ping ok"
+        try:
+            await client.xgroup_create(_HEALTH_STREAM, _HEALTH_GROUP, id="0", mkstream=True)
+        except Exception:  # noqa: BLE001 — BUSYGROUP just means it already exists
+            pass
+        await client.xreadgroup(
+            _HEALTH_GROUP, "healthcheck", {_HEALTH_STREAM: ">"}, count=1, block=100
+        )
+        return "ping + blocking read ok"
     finally:
         await client.aclose()  # type: ignore[attr-defined]  # types-redis lags runtime
 
@@ -75,9 +94,26 @@ async def _check_deepseek(s: Settings) -> str:
 
 
 async def _check_ollama(s: Settings) -> str:
+    """Reachable *and* has the configured models pulled.
+
+    Reachability alone is misleading: `/api/tags` answers 200 on a fresh
+    Ollama with nothing installed, while every embed/probe call then 404s at
+    runtime (memory retrieval silently degrades). Name the missing models so
+    the fix is obvious — `ollama pull <model>`.
+    """
     async with httpx.AsyncClient(timeout=s.ollama_timeout_s) as client:
         resp = await client.get(f"{s.ollama_base_url}/api/tags")
-        return f"HTTP {resp.status_code}"
+        resp.raise_for_status()
+        installed = {m.get("name", "") for m in resp.json().get("models", [])}
+
+    # Ollama reports "name:tag"; a bare configured name means the default tag.
+    def _present(model: str) -> bool:
+        return model in installed or f"{model}:latest" in installed
+
+    missing = [m for m in (s.ollama_embed_model, s.ollama_probe_model) if not _present(m)]
+    if missing:
+        raise RuntimeError(f"model not pulled: {', '.join(missing)} — run `ollama pull <model>`")
+    return f"HTTP {resp.status_code}, models ok"
 
 
 async def _check_whatsapp(s: Settings) -> str:

@@ -15,6 +15,7 @@ from pathlib import Path
 import typer
 
 from agent.cli._output import console, err_console
+from agent.cli.db import run_migrations
 
 
 def _find_repo_root() -> Path | None:
@@ -48,6 +49,14 @@ def update() -> None:
             "`git pull --ff-only` refuses to overwrite them.[/]"
         )
         raise typer.Exit(code=1) from None
+
+    # An update may ship new migrations; applying them here keeps `agent
+    # update` a single step. Quiet + best-effort: Postgres may legitimately be
+    # down at this moment, and that shouldn't fail the code update.
+    if run_migrations(quiet=True):
+        console.print("[dim]Database schema up to date.[/]")
+    else:
+        console.print("[yellow]Migrations not applied[/] — run [cyan]agent db upgrade[/] later.")
 
     console.print("[green]Updated.[/] Restart `agent` / `agent up` for changes to take effect.")
 

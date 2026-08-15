@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     http_port: int = 8099
 
     # Redis — event bus, quota, revocation cache.
-    redis_url: str = "redis://localhost:6379/0"
+    redis_url: str = "redis://localhost:6380/0"
 
     # Postgres + pgvector.
     postgres_dsn: str = "postgresql+asyncpg://agent:agent@localhost:5433/agent"

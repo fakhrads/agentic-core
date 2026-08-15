@@ -19,6 +19,7 @@ from rich.prompt import Confirm, Prompt
 from agent.cli._envfile import read_env, write_env
 from agent.cli._output import console, err_console
 from agent.cli._providers import prompt_llm_provider
+from agent.cli.db import run_migrations
 from agent.config import Settings, reset_settings_cache
 
 _ENV_PATH = Path(".env")
@@ -61,7 +62,7 @@ def setup() -> None:
 
     console.print("\n[bold]Redis + Postgres[/]")
     updates["AGENT_REDIS_URL"] = _ask(
-        "Redis URL", current, "AGENT_REDIS_URL", "redis://localhost:6379/0"
+        "Redis URL", current, "AGENT_REDIS_URL", "redis://localhost:6380/0"
     )
     updates["AGENT_POSTGRES_DSN"] = _ask(
         "Postgres DSN",
@@ -137,6 +138,15 @@ def setup() -> None:
     s = Settings()
     for k, v in s.redacted().items():
         console.print(f"  [dim]{k}[/] = {v}")
+
+    # Without the schema the daemon starts fine but can never persist an
+    # episode — the bot looks alive and silently never answers. Do it here so
+    # the happy path is genuinely one command.
+    console.print("\n[bold]Database schema[/]")
+    if run_migrations():
+        console.print("[green]Tables are up to date.[/]")
+    else:
+        console.print("[yellow]Skipped — run [cyan]agent db upgrade[/] once Postgres is up.[/]")
 
     console.print(
         "\n[bold]Next:[/] run [cyan]agent health[/] to verify connectivity, "
