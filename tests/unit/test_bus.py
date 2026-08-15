@@ -1,5 +1,8 @@
+import asyncio
+
 import fakeredis.aioredis
 import pytest
+import redis.exceptions
 
 from agent.bus.events import STREAM_AUDIT, STREAM_DLQ, Event, EventType
 from agent.bus.streams import ConsumerRunner, EventBus
@@ -71,6 +74,63 @@ async def test_unparseable_event_goes_to_dlq(bus: EventBus) -> None:
     stats = await bus.process_batch(STREAM_AUDIT, "g3", "c1", handler, block_ms=10)
     assert stats.parse_errors == 1
     assert await bus.xlen(STREAM_DLQ) == 1
+
+
+class _FlakyBus:
+    """process_batch fails a few times (simulating a transient redis hiccup),
+    then succeeds. ensure_group is a no-op."""
+
+    def __init__(self, fail_times: int) -> None:
+        self.fail_times = fail_times
+        self.calls = 0
+
+    async def ensure_group(self, stream: str, group: str) -> None:
+        return None
+
+    async def process_batch(self, *args: object, **kwargs: object) -> None:
+        self.calls += 1
+        # Always yield — a real xreadgroup call awaits I/O either way, and
+        # without this the success path never yields control back to the
+        # event loop, starving the test's own stop-watcher task forever.
+        await asyncio.sleep(0)
+        if self.calls <= self.fail_times:
+            raise redis.exceptions.TimeoutError("Timeout reading from localhost:6379")
+
+
+async def test_consumer_runner_survives_transient_redis_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Regression: a single spurious TimeoutError on the blocking XREADGROUP
+    # call (redis-py occasionally raises these under network jitter, e.g. via
+    # Docker port-forwarding — not an actual outage) used to crash the whole
+    # daemon, since asyncio.gather propagates one task's exception to every
+    # sibling. The consumer loop must log and keep going instead.
+    # `agent.bus.streams.asyncio` is the real asyncio module (not a copy), so
+    # capture the original sleep before patching to avoid patching over itself.
+    _real_sleep = asyncio.sleep
+    monkeypatch.setattr("agent.bus.streams.asyncio.sleep", lambda _s: _real_sleep(0))
+
+    async def handler(ev: Event) -> None:  # pragma: no cover - not invoked
+        pass
+
+    flaky_bus = _FlakyBus(fail_times=3)
+    runner = ConsumerRunner(
+        bus=flaky_bus,  # type: ignore[arg-type]
+        stream=STREAM_AUDIT,
+        group="g5",
+        consumer="c1",
+        handler=handler,
+    )
+
+    async def _stop_after_calls() -> None:
+        while flaky_bus.calls < 5:  # noqa: ASYNC110 - polling a plain counter, not a real wait
+            await asyncio.sleep(0)
+        runner.stop()
+
+    await asyncio.wait_for(
+        asyncio.gather(runner.run(), _stop_after_calls()), timeout=2.0
+    )
+    assert flaky_bus.calls >= 5  # kept looping through the failures
 
 
 async def test_consumer_runner_defaults_to_a_short_poll(bus: EventBus) -> None:

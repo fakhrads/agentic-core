@@ -8,6 +8,7 @@ so a poison event can never wedge the loop.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 
@@ -253,13 +254,22 @@ class ConsumerRunner:
         await self.bus.ensure_group(self.stream, self.group)
         log.info("consumer_started", stream=self.stream, group=self.group)
         while not self._stop:
-            await self.bus.process_batch(
-                self.stream,
-                self.group,
-                self.consumer,
-                self.handler,
-                max_deliveries=self.max_deliveries,
-                min_idle_ms=self.min_idle_ms,
-                block_ms=self.block_ms,
-            )
+            try:
+                await self.bus.process_batch(
+                    self.stream,
+                    self.group,
+                    self.consumer,
+                    self.handler,
+                    max_deliveries=self.max_deliveries,
+                    min_idle_ms=self.min_idle_ms,
+                    block_ms=self.block_ms,
+                )
+            except Exception as exc:  # noqa: BLE001 — a transient redis/network
+                # hiccup on the blocking XREADGROUP call must not take the whole
+                # daemon down with it (asyncio.gather propagates any task's
+                # exception to every sibling task). Log and keep polling;
+                # CancelledError isn't an Exception subclass so a real stop()
+                # still exits the loop normally on the next check.
+                log.warning("consumer_batch_failed", stream=self.stream, error=str(exc))
+                await asyncio.sleep(1.0)
         log.info("consumer_stopped", stream=self.stream, group=self.group)
