@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One-line installer, Hermes-style:
-#   curl -fsSL https://raw.githubusercontent.com/<org>/agentic-core/main/scripts/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/fakhrads/agentic-core/refs/heads/main/scripts/install.sh | bash
 #
 # Sets up a venv, installs the `agent` package, drops a shim on PATH, copies
 # .env.example -> .env, and (if docker is available) starts redis+postgres.
@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-REPO_URL="${AGENT_REPO_URL:-https://github.com/<org>/agentic-core.git}"
+REPO_URL="${AGENT_REPO_URL:-https://github.com/fakhrads/agentic-core.git}"
 INSTALL_DIR="${AGENT_INSTALL_DIR:-$HOME/.agentic-core}"
 BIN_DIR="${AGENT_BIN_DIR:-$HOME/.local/bin}"
 

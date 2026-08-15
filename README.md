@@ -45,7 +45,7 @@ bisa "mikir". Tanpa API key, agent-nya bisa jalan tapi nggak bisa balas apa-apa.
 Buka terminal, tempel perintah ini:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/fakhrads/agentic-core/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/fakhrads/agentic-core/refs/heads/main/scripts/install.sh | bash
 ```
 
 Perintah ini otomatis akan:
