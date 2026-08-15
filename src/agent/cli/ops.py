@@ -9,6 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import redis.exceptions as redis_exceptions
 import typer
 from rich.table import Table
 
@@ -26,7 +27,10 @@ _PIDFILE = Path(os.environ.get("AGENT_PIDFILE", "./.agent.pid"))
 #: as its own TimeoutError/ConnectionError) — a normal side effect of stopping
 #: this way, not a problem the user needs to act on. `agent health` is the
 #: right tool if a real outage is suspected, not this exit path.
-_SHUTDOWN_NOISE = (TimeoutError, ConnectionError, OSError)
+#: redis-py's own exceptions (RedisError and subclasses like TimeoutError/
+#: ConnectionError) do NOT subclass the builtins of the same name — both
+#: families are listed explicitly here.
+_SHUTDOWN_NOISE = (TimeoutError, ConnectionError, OSError, redis_exceptions.RedisError)
 
 
 def _serve() -> None:

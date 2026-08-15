@@ -343,6 +343,16 @@ class Daemon:
         try:
             await asyncio.gather(*tasks)
         finally:
+            # If any task raised (or we got here via cancellation), the rest
+            # are typically still running — leaving them dangling means they
+            # get force-cancelled by asyncio.run()'s own teardown instead, each
+            # logging its own separate "exception was never retrieved"-style
+            # traceback. Cancel + drain them here first so shutdown produces
+            # at most one exception, not a cascade.
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
             await self.aclose()
 
     async def aclose(self) -> None:
