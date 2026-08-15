@@ -140,6 +140,7 @@ class Daemon:
             tools_client=self.tools_client,
             tool_cache=self.tool_cache,
             embedder=self.ollama,
+            max_reply_tokens=settings.max_reply_tokens,
         )
         self.loop = AgentLoop(ctx)
         self.consumer = ConsumerRunner(

@@ -76,6 +76,12 @@ class Settings(BaseSettings):
     whatsapp_bridge_secret: SecretStr = SecretStr("")
     whatsapp_allowed_numbers: str = ""
 
+    # Per-reply completion cap. Reasoning models (deepseek-v4-*, o-series, …)
+    # spend this same budget on their internal reasoning *before* emitting any
+    # answer, so a tight cap makes them return empty content with
+    # finish_reason="length" — the agent then has nothing to reply with.
+    max_reply_tokens: int = 2048
+
     # Daily autonomy budget.
     budget_tokens: int = 500_000
     budget_cost_usd: float = 2.00

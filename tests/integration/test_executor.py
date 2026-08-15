@@ -5,7 +5,7 @@ import fakeredis.aioredis
 from agent.autonomy.budget import BudgetManager
 from agent.bus.streams import EventBus
 from agent.channels.base import ChannelRegistry
-from agent.llm.base import BudgetedLLM
+from agent.llm.base import BudgetedLLM, LLMResult
 from agent.llm.recorder import NullCostRecorder
 from agent.loop.context import LoopContext
 from agent.loop.executor import run_reply
@@ -112,3 +112,20 @@ async def test_unknown_tool_is_reported_without_backend_call() -> None:
     assert "unknown" in (outcome.tools[0].error or "")
     # Backend was never asked to invoke the unknown tool.
     assert client.invocations == []
+
+
+async def test_empty_model_reply_never_reaches_the_user() -> None:
+    # End-to-end through the executor: the LLM answers with nothing (the
+    # reasoning-model truncation case), and run_reply must still produce text.
+    empty = LLMResult(
+        text="",
+        provider="deepseek",
+        model="deepseek-v4-flash",
+        tok_in=80,
+        tok_out=512,
+        cost_usd=0.001,
+        finish_reason="length",
+    )
+    ctx, _client = await _ctx([empty], tools=[], results={})
+    outcome = await run_reply(ctx, "halo", trace_id="t-empty")
+    assert outcome.text.strip(), "an empty reply reaches the user as silence"

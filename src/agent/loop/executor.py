@@ -20,8 +20,43 @@ from typing import Any
 
 from agent.autonomy.tiers import gate
 from agent.llm.base import ChatMessage, LLMResult, ToolCall
+from agent.logging import get_logger
 from agent.loop.context import LoopContext
 from agent.tools.client import ToolTransportError
+
+log = get_logger("loop.executor")
+
+#: Shown when the model produced no usable text. Sending the empty string
+#: instead reaches the user as no reply at all — the agent looks dead.
+_EMPTY_REPLY_FALLBACK = "Maaf, aku belum bisa menyusun jawaban untuk itu. Coba ulangi ya."
+
+
+def _reply_text(result: LLMResult) -> str:
+    """The model's answer, never empty.
+
+    Reasoning models spend `max_tokens` on internal reasoning first, so a cap
+    that's too low returns empty content with finish_reason="length". Name that
+    case in the logs — the fix is raising AGENT_MAX_REPLY_TOKENS, which is not
+    guessable from a silent bot.
+    """
+    if result.text.strip():
+        return result.text
+    if result.finish_reason == "length":
+        log.warning(
+            "reply_truncated_before_answer",
+            provider=result.provider,
+            model=result.model,
+            tok_out=result.tok_out,
+            hint="raise AGENT_MAX_REPLY_TOKENS — the model hit the cap while reasoning",
+        )
+    else:
+        log.warning(
+            "reply_empty",
+            provider=result.provider,
+            model=result.model,
+            finish_reason=result.finish_reason,
+        )
+    return _EMPTY_REPLY_FALLBACK
 
 
 @dataclass(slots=True)
@@ -101,7 +136,7 @@ async def run_reply(
 
         if not result.tool_calls:
             return ReplyOutcome(
-                text=result.text,
+                text=_reply_text(result),
                 tok_in=tot_in,
                 tok_out=tot_out,
                 cost_usd=cost,
@@ -131,7 +166,7 @@ async def run_reply(
     tot_out += final.tok_out
     cost += final.cost_usd
     return ReplyOutcome(
-        text=final.text or "Maaf, aku belum bisa menyelesaikan permintaan itu.",
+        text=_reply_text(final),
         tok_in=tot_in,
         tok_out=tot_out,
         cost_usd=cost,

@@ -79,6 +79,12 @@ class AgentLoop:
 
     async def _send(self, inbound: InboundMessage, text: str) -> bool:
         """Send a reply through the AUTO gate. Returns True if it went out."""
+        if not text.strip():
+            # Belt-and-braces: an empty send reaches the user as silence, which
+            # is indistinguishable from the agent being down. Callers already
+            # substitute a fallback; this catches any path that doesn't.
+            log.error("send_empty_reply_suppressed", channel=inbound.channel)
+            return False
         decision = await gate("chat.send", drift_paused=self.ctx.drift_paused)
         if not decision.allowed:
             log.warning("send_blocked", reason=decision.reason)
