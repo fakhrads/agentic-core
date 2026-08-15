@@ -141,6 +141,7 @@ class Daemon:
             tool_cache=self.tool_cache,
             embedder=self.ollama,
             max_reply_tokens=settings.max_reply_tokens,
+            playbook_dir=settings.playbook_dir,
         )
         self.loop = AgentLoop(ctx)
         self.consumer = ConsumerRunner(

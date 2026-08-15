@@ -56,6 +56,16 @@ class PlaybookStore:
         p.write_text(content, encoding="utf-8")
 
 
+def is_untouched(file: str, content: str) -> bool:
+    """True when the file still holds only its scaffold header.
+
+    Lets callers skip files the agent has never written to, instead of feeding
+    three empty section headers into every prompt.
+    """
+    PlaybookStore.validate(file)
+    return content.strip() == _HEADERS[file].strip()
+
+
 def unified_diff(old: str, new: str, file: str) -> str:
     lines = difflib.unified_diff(
         old.splitlines(keepends=True),

@@ -63,6 +63,9 @@ class ScriptedLLM:
         self._script = script
         self.calls = 0
         self.last_tools: Sequence[dict[str, Any]] | None = None
+        # Messages from the most recent call — lets tests assert on what the
+        # model was actually shown (system prompt, injected context, ...).
+        self.seen_messages: Sequence[ChatMessage] = []
 
     async def complete(
         self,
@@ -74,6 +77,7 @@ class ScriptedLLM:
         on_attempt: OnAttempt | None = None,
     ) -> LLMResult:
         self.last_tools = tools
+        self.seen_messages = messages
         result = self._script[min(self.calls, len(self._script) - 1)]
         self.calls += 1
         if on_attempt is not None:

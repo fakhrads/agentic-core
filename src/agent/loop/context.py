@@ -36,6 +36,10 @@ class LoopContext:
     # Embedder is optional — when set, the loop retrieves relevant memory (M10).
     embedder: Embedder | None = None
     retrieval_k: int = 3
+    # Playbook dir (SELF/USER/MEMORY.md). Read into every prompt as durable
+    # memory — the agent's only persistent knowledge when vector retrieval is
+    # unavailable (no embedding model, Ollama down, empty archive).
+    playbook_dir: str | None = None
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
     max_reply_tokens: int = 512
     max_tool_iters: int = 4

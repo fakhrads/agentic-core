@@ -30,6 +30,8 @@ from agent.loop.context import LoopContext
 from agent.loop.executor import ReplyOutcome, run_reply
 from agent.loop.planner import plan
 from agent.memory.retrieval import hybrid_search, mark_retrieved
+from agent.playbook.context import build_context
+from agent.playbook.store import PlaybookStore
 from agent.tools.needs import record_tool_need
 from agent.trace import set_episode_id, trace_context
 
@@ -77,6 +79,17 @@ class AgentLoop:
             log.warning("retrieval_failed", error=str(exc))
             return ""
 
+    def _playbook_context(self) -> str:
+        """Durable memory from the playbook files. Best-effort, like retrieval:
+        an unreadable playbook degrades the reply, it never blocks it."""
+        if self.ctx.playbook_dir is None:
+            return ""
+        try:
+            return build_context(PlaybookStore(self.ctx.playbook_dir))
+        except Exception as exc:  # noqa: BLE001 — context is an enhancement
+            log.warning("playbook_context_failed", error=str(exc))
+            return ""
+
     async def _send(self, inbound: InboundMessage, text: str) -> bool:
         """Send a reply through the AUTO gate. Returns True if it went out."""
         if not text.strip():
@@ -115,7 +128,11 @@ class AgentLoop:
             started = time.perf_counter()
             try:
                 outcome = await run_reply(
-                    self.ctx, inbound.text, trace_id, context_block=context_block
+                    self.ctx,
+                    inbound.text,
+                    trace_id,
+                    context_block=context_block,
+                    playbook_block=self._playbook_context(),
                 )
             except BudgetExceeded as exc:
                 await self._finish_failed(inbound, trace_id, reason=str(exc))

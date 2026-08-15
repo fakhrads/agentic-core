@@ -129,3 +129,28 @@ async def test_empty_model_reply_never_reaches_the_user() -> None:
     ctx, _client = await _ctx([empty], tools=[], results={})
     outcome = await run_reply(ctx, "halo", trace_id="t-empty")
     assert outcome.text.strip(), "an empty reply reaches the user as silence"
+
+
+async def test_playbook_reaches_the_model_without_any_embedder(tmp_path) -> None:
+    # The no-embedding-model case: retrieval contributes nothing, so the
+    # playbook is the agent's only durable memory. It must land in the prompt.
+    from agent.playbook.context import build_context
+    from agent.playbook.store import MEMORY_FILE, PlaybookStore
+
+    store = PlaybookStore(tmp_path)
+    store.ensure()
+    store.write(MEMORY_FILE, "# MEMORY\n\n- Operator's dog is named Bakso.\n")
+
+    scripted = ScriptedLLM([final_result("noted")])
+    ctx, _client = await _ctx([final_result("noted")], tools=[], results={})
+    ctx.llm = BudgetedLLM(scripted, ctx.budget, NullCostRecorder())
+    ctx.embedder = None  # no embedding model available
+    ctx.playbook_dir = str(tmp_path)
+
+    await run_reply(
+        ctx, "what's my dog called?", trace_id="t-pb",
+        playbook_block=build_context(store),
+    )
+
+    system_prompt = scripted.seen_messages[0].content or ""
+    assert "Bakso" in system_prompt

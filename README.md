@@ -173,7 +173,39 @@ Ada 3 mode, pilih sesuai kebutuhan:
 
 `agent down` buat matiin proses yang dijalankan dengan `agent up --detach`.
 
-### 9. Update ke versi terbaru
+### 9. Bikin agent-nya inget kamu (playbook)
+
+Agent punya 3 file catatan yang **selalu dibaca tiap kali kamu chat** — mirip `MEMORY.md`
+di Hermes. Lokasinya di folder `playbook/` (atur lewat `AGENT_PLAYBOOK_DIR`):
+
+| File | Isinya |
+|---|---|
+| `SELF.md` | Siapa agent-nya: peran, gaya bahasa, batasan |
+| `USER.md` | Apa yang dia tau tentang kamu |
+| `MEMORY.md` | Fakta-fakta yang perlu diinget terus |
+
+Tinggal edit pakai teks biasa, nggak perlu format khusus:
+
+```markdown
+# MEMORY
+
+- Nama panggilan operator: Bang Fakhri.
+- Proyek yang lagi dikerjain: agentic-core.
+- Lebih suka jawaban Bahasa Indonesia yang santai.
+```
+
+Nggak perlu restart — perubahannya kepakai di chat berikutnya.
+
+**Ini jalan tanpa model embedding sama sekali.** Agent punya 2 lapis ingatan: playbook (file
+teks, selalu aktif) dan memori vektor (butuh Ollama + model embedding, buat nyari otomatis dari
+riwayat lama). Kalau embedding-nya belum ada, playbook tetep bikin agent inget hal-hal penting.
+Isi playbook juga diperlakukan lebih dipercaya daripada hasil pencarian vektor, karena ini kamu
+yang nulis sendiri.
+
+> Ukurannya dibatasi ~4000 karakter total biar nggak makan jatah token tiap chat. Kalau
+> kepanjangan, `MEMORY.md` yang dipotong duluan — `SELF.md` dan `USER.md` diprioritaskan.
+
+### 10. Update ke versi terbaru
 
 ```bash
 agent update
@@ -187,7 +219,7 @@ Setelah update, restart proses yang lagi jalan (`agent` / `agent up`) biar perub
 > terjadi kecuali kamu ngedit sendiri file di sana), commit/stash dulu perubahannya, baru
 > `agent update` lagi.
 
-### 10. Kalau ada masalah
+### 11. Kalau ada masalah
 
 ```bash
 agent doctor --fix
@@ -231,7 +263,7 @@ Masalah umum:
 - **tools_backend / whatsapp `ConnectError`** → wajar kalau kamu belum setup itu; keduanya
   soft dependency, agent tetap jalan tanpa itu.
 
-### 11. Buat yang mau ikut develop
+### 12. Buat yang mau ikut develop
 
 ```bash
 git clone <repo-url> && cd agentic-core
@@ -245,7 +277,7 @@ mypy                    # type checker
 pytest                  # test suite
 ```
 
-### 12. Rencana ke depan: aplikasi desktop
+### 13. Rencana ke depan: aplikasi desktop
 
 Belum ada aplikasi desktop-nya — untuk sekarang fokusnya CLI + web dulu. Tapi fondasinya sudah
 disiapkan: `agent up` menyediakan `GET /api/status`, endpoint JSON yang isinya sama persis

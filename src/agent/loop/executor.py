@@ -105,9 +105,19 @@ def _assistant_echo(result: LLMResult) -> ChatMessage:
 
 
 async def run_reply(
-    ctx: LoopContext, user_text: str, trace_id: str, *, context_block: str = ""
+    ctx: LoopContext,
+    user_text: str,
+    trace_id: str,
+    *,
+    context_block: str = "",
+    playbook_block: str = "",
 ) -> ReplyOutcome:
     system = ctx.system_prompt
+    # The playbook is curated and durable; retrieval is fuzzy nearest-neighbour
+    # output. Labelling them differently keeps the model from treating a weak
+    # vector hit as being as authoritative as a written-down fact.
+    if playbook_block:
+        system = f"{system}\n\nYour playbook (durable, authoritative):\n{playbook_block}"
     if context_block:
         system = f"{system}\n\nRelevant memory (may be imperfect):\n{context_block}"
     messages: list[ChatMessage] = [
