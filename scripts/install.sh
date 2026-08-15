@@ -36,7 +36,11 @@ python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else 1)' \
 
 if [ -f "pyproject.toml" ] && grep -q '^name = "agent-core"' pyproject.toml 2>/dev/null; then
     INSTALL_DIR="$(pwd)"
-    info "Already inside an agentic-core checkout ($INSTALL_DIR) — installing in place."
+    info "Already inside an agentic-core checkout ($INSTALL_DIR)."
+    if [ -d ".git" ]; then
+        info "Pulling latest."
+        git pull --ff-only || warn "git pull failed (local changes?) — continuing with what's on disk."
+    fi
 elif [ -d "$INSTALL_DIR/.git" ]; then
     info "Found existing checkout at $INSTALL_DIR — pulling latest."
     git -C "$INSTALL_DIR" pull --ff-only

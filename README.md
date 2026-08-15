@@ -175,7 +175,21 @@ Ada 3 mode, pilih sesuai kebutuhan:
 
 `agent down` buat matiin proses yang dijalankan dengan `agent up --detach`.
 
-### 9. Kalau ada masalah
+### 9. Update ke versi terbaru
+
+```bash
+agent update
+```
+
+Ini otomatis nemuin folder instalasi kamu (nggak peduli kamu jalanin dari mana), `git pull`
+kode terbarunya, terus `pip install -e .` ulang biar dependency baru (kalau ada) ikut kepasang.
+Setelah update, restart proses yang lagi jalan (`agent` / `agent up`) biar perubahannya kepakai.
+
+> Kalau `git pull`-nya gagal karena kamu punya perubahan lokal di folder instalasi (jarang
+> terjadi kecuali kamu ngedit sendiri file di sana), commit/stash dulu perubahannya, baru
+> `agent update` lagi.
+
+### 10. Kalau ada masalah
 
 ```bash
 agent health
@@ -196,8 +210,12 @@ Masalah umum:
 - **Provider LLM error 401** → API key salah/kosong, jalankan `agent model set` buat perbaiki.
 - **Ollama error** → `ollama serve` belum jalan di komputer kamu, atau modelnya belum di-pull
   (`ollama pull nomic-embed-text` dan `ollama pull qwen2.5:3b`).
+- **postgres error soal `greenlet`** → dependency ketinggalan, jalankan `agent update` (atau
+  `pip install -e .` lagi) buat narik versi terbaru.
+- **tools_backend / whatsapp `ConnectError`** → wajar kalau kamu belum setup itu; keduanya
+  soft dependency, agent tetap jalan tanpa itu.
 
-### 10. Buat yang mau ikut develop
+### 11. Buat yang mau ikut develop
 
 ```bash
 git clone <repo-url> && cd agentic-core
@@ -211,7 +229,7 @@ mypy                    # type checker
 pytest                  # test suite
 ```
 
-### 11. Rencana ke depan: aplikasi desktop
+### 12. Rencana ke depan: aplikasi desktop
 
 Belum ada aplikasi desktop-nya — untuk sekarang fokusnya CLI + web dulu. Tapi fondasinya sudah
 disiapkan: `agent up` menyediakan `GET /api/status`, endpoint JSON yang isinya sama persis

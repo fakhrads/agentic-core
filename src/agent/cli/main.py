@@ -29,6 +29,7 @@ from agent.cli.review import review
 from agent.cli.setup import setup
 from agent.cli.skills import skills_app
 from agent.cli.tools import tools_app
+from agent.cli.update import update
 from agent.cli.watch import watch
 
 app = typer.Typer(
@@ -51,6 +52,7 @@ def _default(ctx: typer.Context) -> None:
 # --- Install/run UX ---
 app.command("setup")(setup)
 app.command("chat")(chat)
+app.command("update")(update)
 app.add_typer(model_app, name="model")
 
 # --- Real M1 commands ---
