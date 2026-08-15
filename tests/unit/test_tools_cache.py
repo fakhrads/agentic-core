@@ -1,3 +1,7 @@
+import asyncio
+
+import fakeredis.aioredis
+
 from agent.tools.cache import ToolCache
 from agent.tools.client import ToolTransportError
 from agent.tools.models import ToolEntry
@@ -58,3 +62,21 @@ async def test_run_survives_unreachable_tools_backend() -> None:
     await cache.run()  # must not raise
     assert cache.refreshes == 0
     assert cache.usable() == []
+
+
+async def test_stop_is_noticed_promptly_even_with_a_long_refresh_interval() -> None:
+    # Regression: `run()` used to block on `pubsub.get_message(timeout=refresh_interval_s)`,
+    # so `stop()` wasn't noticed until that call timed out — up to 5 minutes at
+    # the default interval, making `agent up` feel hung on shutdown (and tempting
+    # a second Ctrl-C, which force-cancels tasks mid-read and dumps an ugly
+    # traceback instead of exiting cleanly). A short-poll loop must notice
+    # `stop()` within about a second regardless of the configured interval.
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    client = FakeToolsClient(tools=[_entry("a", "active")])
+    cache = ToolCache(client, redis, refresh_interval_s=300.0)
+
+    task = asyncio.create_task(cache.run())
+    await asyncio.sleep(0.2)  # let it reach the poll loop
+    cache.stop()
+    await asyncio.wait_for(task, timeout=3.0)  # would previously hang ~300s
+    await redis.aclose()  # type: ignore[attr-defined]

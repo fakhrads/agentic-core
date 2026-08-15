@@ -77,23 +77,35 @@ class ToolCache:
             log.warning("tools_refresh_failed", error=str(exc))
 
     async def run(self) -> None:
-        """Background loop: refresh on interval, or immediately on pub/sub signal."""
+        """Background loop: refresh on interval, or immediately on pub/sub signal.
+
+        Polls pub/sub in short (<=1s) slices rather than blocking for the full
+        `refresh_interval_s` — otherwise `stop()` wouldn't be noticed until the
+        in-flight `get_message` call times out (up to 5 minutes at the default
+        interval), making `agent up` feel hung on shutdown.
+        """
         await self._safe_refresh()
         if self._redis is None:
             return
         pubsub = self._redis.pubsub()
         await pubsub.subscribe(CHANNEL_TOOLS_CHANGED)
         log.info("tools_cache_watching", channel=CHANNEL_TOOLS_CHANGED)
+        poll_s = min(self._interval, 1.0)
+        elapsed = 0.0
         try:
             while not self._stop:
-                msg = await pubsub.get_message(
-                    ignore_subscribe_messages=True, timeout=self._interval
-                )
+                msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=poll_s)
                 if self._stop:
                     break
                 if msg is not None:
                     log.info("tools_changed_signal")
-                await self._safe_refresh()
+                    await self._safe_refresh()
+                    elapsed = 0.0
+                    continue
+                elapsed += poll_s
+                if elapsed >= self._interval:
+                    await self._safe_refresh()
+                    elapsed = 0.0
         finally:
             await pubsub.unsubscribe(CHANNEL_TOOLS_CHANGED)
             await pubsub.aclose()  # type: ignore[attr-defined]

@@ -22,10 +22,22 @@ _PIDFILE = Path(os.environ.get("AGENT_PIDFILE", "./.agent.pid"))
 
 
 def _serve() -> None:
-    """Run the full daemon (health server + loop consumer + channels)."""
+    """Run the full daemon (health server + loop consumer + channels).
+
+    A first Ctrl-C triggers the daemon's own graceful shutdown (see
+    `Daemon.run`'s signal handler); this only exists to catch what a forced
+    second Ctrl-C (or any other shutdown-time hiccup) kicks loose, so it
+    prints one clean line instead of a wall of tracebacks.
+    """
     from agent.daemon import run_daemon
 
-    asyncio.run(run_daemon())
+    try:
+        asyncio.run(run_daemon())
+    except KeyboardInterrupt:
+        err_console.print("\n[dim]agent stopped[/]")
+    except Exception as exc:  # noqa: BLE001
+        err_console.print(f"[red]agent stopped with an error:[/] {type(exc).__name__}: {exc}")
+        raise typer.Exit(code=1) from None
 
 
 @ops_app.command("up")
