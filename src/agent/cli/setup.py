@@ -67,7 +67,7 @@ def setup() -> None:
         "Postgres DSN",
         current,
         "AGENT_POSTGRES_DSN",
-        "postgresql+asyncpg://agent:agent@localhost:5432/agent",
+        "postgresql+asyncpg://agent:agent@localhost:5433/agent",
     )
     start_docker = shutil.which("docker") is not None and Confirm.ask(
         "Start redis+postgres now via `docker compose up -d`?", default=True

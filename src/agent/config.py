@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
 
     # Postgres + pgvector.
-    postgres_dsn: str = "postgresql+asyncpg://agent:agent@localhost:5432/agent"
+    postgres_dsn: str = "postgresql+asyncpg://agent:agent@localhost:5433/agent"
 
     # Primary chat provider — DeepSeekProvider is OpenAI-wire-compatible, so
     # these fields double as the generic "primary LLM" slot for any

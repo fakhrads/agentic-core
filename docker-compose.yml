@@ -21,7 +21,9 @@ services:
       POSTGRES_PASSWORD: agent
       POSTGRES_DB: agent
     ports:
-      - "5432:5432"
+      # Host port 5433, not 5432 — avoids colliding with a native/Homebrew
+      # Postgres already running on the default port (common on dev machines).
+      - "5433:5432"
     volumes:
       - pg-data:/var/lib/postgresql/data
     healthcheck:
