@@ -13,6 +13,7 @@ from typing import Any, Protocol
 from redis.asyncio import Redis
 
 from agent.logging import get_logger
+from agent.tools.client import ToolClientError
 from agent.tools.models import STATUS_DISABLED, ToolEntry
 
 log = get_logger("tools.cache")
@@ -65,9 +66,19 @@ class ToolCache:
     def stop(self) -> None:
         self._stop = True
 
+    async def _safe_refresh(self) -> None:
+        # The tools backend is a soft dependency (spec: agent boots without it,
+        # calls just fail at use-time) — a refresh failure must never take down
+        # the daemon's other tasks via asyncio.gather. Keep whatever cache we
+        # last had (possibly empty) and retry on the next interval/signal.
+        try:
+            await self.refresh()
+        except ToolClientError as exc:
+            log.warning("tools_refresh_failed", error=str(exc))
+
     async def run(self) -> None:
         """Background loop: refresh on interval, or immediately on pub/sub signal."""
-        await self.refresh()
+        await self._safe_refresh()
         if self._redis is None:
             return
         pubsub = self._redis.pubsub()
@@ -82,7 +93,7 @@ class ToolCache:
                     break
                 if msg is not None:
                     log.info("tools_changed_signal")
-                await self.refresh()
+                await self._safe_refresh()
         finally:
             await pubsub.unsubscribe(CHANNEL_TOOLS_CHANGED)
             await pubsub.aclose()  # type: ignore[attr-defined]

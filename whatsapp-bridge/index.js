@@ -51,9 +51,13 @@ async function forwardInbound(from, text, id) {
   }
 }
 
-async function start() {
+// Holds the live socket so the HTTP handlers below always see the current
+// connection, even after a reconnect swaps it out.
+let sock = null;
+
+async function connectToWhatsApp() {
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
-  const sock = makeWASocket({ auth: state, logger: pino({ level: 'silent' }) });
+  sock = makeWASocket({ auth: state, logger: pino({ level: 'silent' }) });
 
   sock.ev.on('creds.update', saveCreds);
 
@@ -71,7 +75,10 @@ async function start() {
           ? '[bridge] Logged out. Delete the auth/ folder and restart to scan a new QR code.'
           : '[bridge] Connection dropped, reconnecting...'
       );
-      if (!loggedOut) start();
+      // Only reconnect the WhatsApp socket — never re-run the HTTP server,
+      // it's already listening and re-binding the same port would crash
+      // with EADDRINUSE.
+      if (!loggedOut) connectToWhatsApp();
     } else if (connection === 'open') {
       console.log('[bridge] Connected to WhatsApp.');
     }
@@ -88,7 +95,9 @@ async function start() {
       await forwardInbound(from, text, msg.key.id);
     }
   });
+}
 
+function startServer() {
   const app = express();
   app.use(express.json());
 
@@ -101,13 +110,16 @@ async function start() {
   });
 
   app.get('/health', (_req, res) => {
-    res.json({ ok: true, connected: Boolean(sock.user) });
+    res.json({ ok: true, connected: Boolean(sock?.user) });
   });
 
   app.post('/send', async (req, res) => {
     const { to, text } = req.body || {};
     if (!to || !text) {
       return res.status(400).json({ ok: false, error: 'missing to/text' });
+    }
+    if (!sock) {
+      return res.status(503).json({ ok: false, error: 'not connected to whatsapp yet' });
     }
     try {
       const jid = to.includes('@') ? to : `${to}@s.whatsapp.net`;
@@ -123,4 +135,5 @@ async function start() {
   });
 }
 
-start();
+startServer();
+connectToWhatsApp();
